@@ -1,71 +1,586 @@
 <!DOCTYPE html>
-<html>
+<html lang="fa">
 <head>
 <meta charset="UTF-8">
-<title>Checking</title>
-</head>
-<body>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video</title>
 
-<script>
-const ALLOWED_COUNTRIES = [
-    "iran",
-];
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-async function getCountry() {
-
-    const services = [
-        "https://ipwho.is/",
-        "https://ipapi.co/json/",
-        "https://ipinfo.io/json"
-    ];
-
-    for (const url of services) {
-        try {
-            const response = await fetch(url + "?t=" + Date.now(), {
-                cache: "no-store"
-            });
-
-            if (!response.ok) continue;
-
-            const data = await response.json();
-
-            const country =
-                data.country ||
-                data.country_name ||
-                "";
-
-            if (country) {
-                return country.trim().toLowerCase();
-            }
-
-        } catch (error) {
-            // سرویس بعدی امتحان می‌شود
-        }
-    }
-
-    return null;
+<style>
+*{
+    box-sizing:border-box;
 }
 
-(async function () {
+body{
+    margin:0;
+    background:#0b0b0b;
+    color:#fff;
+    font-family:Arial,sans-serif;
+}
 
-    const country = await getCountry();
+main{
+    width:100%;
+    max-width:900px;
+    margin:auto;
+    padding:20px;
+}
 
-    if (!country) {
-        document.body.textContent = "ERROR: Could not detect country";
+video{
+    width:100%;
+    max-height:75vh;
+    background:#000;
+    border-radius:14px;
+    display:block;
+}
+
+#views{
+    margin-top:12px;
+    color:#aaa;
+    font-size:15px;
+}
+
+#ownerPanel{
+    display:none;
+    margin-top:25px;
+    padding:18px;
+    border-radius:14px;
+    background:#151515;
+}
+
+button,
+input{
+    width:100%;
+    margin-top:10px;
+    padding:13px;
+    border:0;
+    border-radius:10px;
+}
+
+button{
+    background:#fff;
+    color:#000;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+#status{
+    margin-top:12px;
+    color:#aaa;
+    font-size:14px;
+}
+
+#upload{
+    display:none;
+}
+
+#empty{
+    text-align:center;
+    color:#777;
+    padding:80px 10px;
+}
+</style>
+</head>
+
+<body>
+
+<main>
+
+    <div id="videoContainer"></div>
+
+    <div id="empty">
+        هنوز ویدیویی آپلود نشده است.
+    </div>
+
+    <div id="views">
+        0 بازدید
+    </div>
+
+    <div id="ownerPanel">
+
+        <b>پنل آپلود</b>
+
+        <input
+            id="upload"
+            type="file"
+            accept="video/*"
+        >
+
+        <button onclick="chooseVideo()">
+            انتخاب فیلم
+        </button>
+
+        <button onclick="uploadVideo()">
+            آپلود و جایگزینی فیلم
+        </button>
+
+        <div id="status"></div>
+
+    </div>
+
+</main>
+
+<script>
+
+const SUPABASE_URL = "https://ihbsxjgzrhnssluqooqh.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_hHyHJI5JkxgLNrXAwZrGWQ_vbD3kdrj";
+
+const supabase = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+);
+
+
+/* =========================
+   DEVICE ID
+========================= */
+
+function getDeviceId(){
+
+    let id = localStorage.getItem("video_device_id");
+
+    if(!id){
+
+        id =
+            crypto.randomUUID();
+
+        localStorage.setItem(
+            "video_device_id",
+            id
+        );
+    }
+
+    return id;
+}
+
+
+/* =========================
+   OWNER ID
+========================= */
+
+function getOwnerId(){
+
+    let id = localStorage.getItem(
+        "video_owner_id"
+    );
+
+    if(!id){
+
+        id = crypto.randomUUID();
+
+        localStorage.setItem(
+            "video_owner_id",
+            id
+        );
+    }
+
+    return id;
+}
+
+
+/* =========================
+   FIND / CREATE OWNER
+========================= */
+
+async function checkOwner(){
+
+    const ownerId = getOwnerId();
+
+    const { data, error } = await supabase
+        .from("site_owner")
+        .select("owner_id")
+        .limit(1);
+
+    if(error){
+
+        console.error(error);
         return;
     }
 
-    const allowed = ALLOWED_COUNTRIES.some(
-        c => c.toLowerCase() === country
-    );
 
-    if (allowed) {
-        window.location.replace("/video/home");
-    } else {
-        document.body.textContent = "This service is not available in your region.";
+    /*
+       هیچ مالکی وجود ندارد.
+       این اولین کاربر است.
+    */
+
+    if(!data || data.length === 0){
+
+        const { error: insertError } =
+            await supabase
+            .from("site_owner")
+            .insert({
+                owner_id: ownerId
+            });
+
+        if(!insertError){
+
+            showOwnerPanel(true);
+            return;
+        }
     }
 
-})();
+
+    /*
+       بررسی اینکه این دستگاه
+       همان مالک اولیه است یا نه.
+    */
+
+    if(
+        data &&
+        data.length > 0 &&
+        data[0].owner_id === ownerId
+    ){
+
+        showOwnerPanel(true);
+
+    }else{
+
+        showOwnerPanel(false);
+    }
+}
+
+
+/* =========================
+   OWNER PANEL
+========================= */
+
+function showOwnerPanel(show){
+
+    document.getElementById(
+        "ownerPanel"
+    ).style.display =
+        show ? "block" : "none";
+}
+
+
+/* =========================
+   LOAD VIDEO
+========================= */
+
+async function loadVideo(){
+
+    const { data, error } = await supabase
+        .from("video")
+        .select("*")
+        .order("id", {
+            ascending:false
+        })
+        .limit(1);
+
+    if(error){
+
+        console.error(error);
+        return;
+    }
+
+    if(!data || data.length === 0){
+
+        document.getElementById(
+            "empty"
+        ).style.display = "block";
+
+        return;
+    }
+
+    document.getElementById(
+        "empty"
+    ).style.display = "none";
+
+
+    const currentVideo = data[0];
+
+    const {
+        data: publicData
+    } = supabase.storage
+        .from("videos")
+        .getPublicUrl(
+            currentVideo.file_path
+        );
+
+    const url =
+        publicData.publicUrl;
+
+
+    document.getElementById(
+        "videoContainer"
+    ).innerHTML = `
+        <video
+            id="mainVideo"
+            controls
+            playsinline
+            preload="metadata"
+            src="${url}">
+        </video>
+    `;
+
+
+    await registerView(
+        currentVideo.id
+    );
+
+    await loadViews(
+        currentVideo.id
+    );
+}
+
+
+/* =========================
+   REGISTER VIEW
+========================= */
+
+async function registerView(videoId){
+
+    const deviceId =
+        getDeviceId();
+
+    /*
+       unique(video_id, device_id)
+       باعث می‌شود یک دستگاه
+       برای یک فیلم دوباره ثبت نشود.
+    */
+
+    const { error } =
+        await supabase
+        .from("video_views")
+        .insert({
+            video_id: videoId,
+            device_id: deviceId
+        });
+
+    /*
+       اگر duplicate باشد،
+       عمداً هیچ کاری نمی‌کنیم.
+    */
+
+    if(error){
+
+        console.log(
+            "View already registered."
+        );
+    }
+}
+
+
+/* =========================
+   LOAD VIEWS
+========================= */
+
+async function loadViews(videoId){
+
+    const { count, error } =
+        await supabase
+        .from("video_views")
+        .select(
+            "id",
+            {
+                count:"exact",
+                head:true
+            }
+        )
+        .eq(
+            "video_id",
+            videoId
+        );
+
+    if(error){
+
+        console.error(error);
+        return;
+    }
+
+    document.getElementById(
+        "views"
+    ).textContent =
+        `${count || 0} بازدید`;
+}
+
+
+/* =========================
+   CHOOSE VIDEO
+========================= */
+
+function chooseVideo(){
+
+    document.getElementById(
+        "upload"
+    ).click();
+}
+
+
+/* =========================
+   UPLOAD
+========================= */
+
+async function uploadVideo(){
+
+    const input =
+        document.getElementById(
+            "upload"
+        );
+
+    const status =
+        document.getElementById(
+            "status"
+        );
+
+    if(
+        !input.files ||
+        input.files.length === 0
+    ){
+
+        status.textContent =
+            "ابتدا یک فیلم انتخاب کن.";
+
+        return;
+    }
+
+    const file =
+        input.files[0];
+
+
+    if(!file.type.startsWith("video/")){
+
+        status.textContent =
+            "فایل انتخاب شده فیلم نیست.";
+
+        return;
+    }
+
+
+    status.textContent =
+        "در حال جایگزینی فیلم...";
+
+
+    /*
+       نام ثابت.
+       بنابراین همیشه فقط یک فایل داریم.
+    */
+
+    const filePath =
+        "current_video";
+
+
+    /*
+       حذف فیلم قبلی از Storage
+    */
+
+    const { data: oldVideos } =
+        await supabase.storage
+        .from("videos")
+        .list();
+
+
+    if(oldVideos){
+
+        const files =
+            oldVideos
+            .filter(
+                x => x.name === filePath
+            )
+            .map(
+                x => x.name
+            );
+
+        if(files.length){
+
+            await supabase.storage
+                .from("videos")
+                .remove(files);
+        }
+    }
+
+
+    /*
+       آپلود فیلم جدید
+    */
+
+    const { error: uploadError } =
+        await supabase.storage
+        .from("videos")
+        .upload(
+            filePath,
+            file,
+            {
+                upsert:true,
+                contentType:file.type,
+                cacheControl:"0"
+            }
+        );
+
+
+    if(uploadError){
+
+        console.error(uploadError);
+
+        status.textContent =
+            "خطا در آپلود: " +
+            uploadError.message;
+
+        return;
+    }
+
+
+    /*
+       اطلاعات ویدیوی قبلی را پاک کن.
+       Cascade باعث می‌شود بازدیدهای
+       فیلم قبلی هم پاک شوند.
+    */
+
+    await supabase
+        .from("video")
+        .delete()
+        .neq(
+            "id",
+            0
+        );
+
+
+    /*
+       ثبت فیلم جدید
+    */
+
+    const { error: dbError } =
+        await supabase
+        .from("video")
+        .insert({
+            file_path:filePath,
+            file_name:file.name
+        });
+
+
+    if(dbError){
+
+        console.error(dbError);
+
+        status.textContent =
+            "فیلم آپلود شد ولی ثبت اطلاعات خطا داشت.";
+
+        return;
+    }
+
+
+    status.textContent =
+        "فیلم جدید جایگزین شد.";
+
+    input.value = "";
+
+    await loadVideo();
+}
+
+
+/* =========================
+   START
+========================= */
+
+async function start(){
+
+    await checkOwner();
+
+    await loadVideo();
+}
+
+start();
+
 </script>
 
 </body>
