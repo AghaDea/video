@@ -1,109 +1,48 @@
 <!DOCTYPE html>
 <html lang="fa">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-    name="viewport"
-    content="width=device-width,initial-scale=1"
->
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
 <title>Video</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <style>
-
-*{
-    box-sizing:border-box;
-}
-
-html,
-body{
+html,body{
     margin:0;
     padding:0;
-    background:#080808;
-    color:white;
+    background:#000;
+    color:#fff;
     font-family:Arial,sans-serif;
-}
-
-body{
-    min-height:100vh;
 }
 
 main{
     width:100%;
     max-width:900px;
     margin:auto;
-    padding:16px;
+    padding:15px;
+    box-sizing:border-box;
 }
 
-
-/* VIDEO */
-
-#video{
+video{
     width:100%;
     display:block;
     background:#000;
-    border-radius:15px;
+    border-radius:14px;
 }
 
-
-/* TITLE */
-
 #title{
-    margin-top:15px;
-    font-size:21px;
+    margin-top:14px;
+    font-size:20px;
     font-weight:bold;
 }
 
-
-/* DESCRIPTION */
-
-#description{
+#info{
     margin-top:8px;
     color:#aaa;
-    font-size:15px;
-    line-height:1.7;
-}
-
-
-/* INFO */
-
-#info{
-    display:flex;
-    gap:18px;
-    margin-top:14px;
-    color:#999;
     font-size:14px;
 }
-
-
-/* EMPTY */
-
-#empty{
-    display:none;
-    text-align:center;
-    padding:80px 10px;
-    color:#777;
-}
-
-
-/* ERROR */
-
-#error{
-    display:none;
-    padding:20px;
-    color:#ff7777;
-    text-align:center;
-}
-
 </style>
-
 </head>
-
 
 <body>
 
@@ -116,311 +55,66 @@ main{
         preload="metadata"
     ></video>
 
-
-    <div id="title"></div>
-
-    <div id="description"></div>
-
+    <div id="title">
+        فیلم من
+    </div>
 
     <div id="info">
-
-        <div>
-            👁 <span id="views">0</span> بازدید
-        </div>
-
-        <div>
-            📅 <span id="date">-</span>
-        </div>
-
+        ویدیو
     </div>
-
-
-    <div id="empty">
-        هنوز فیلمی قرار داده نشده است.
-    </div>
-
-
-    <div id="error"></div>
 
 </main>
 
-
 <script>
 
+/* =====================================
+   فقط اینجا لینک فیلم را قرار بده
+===================================== */
 
-/* =====================================================
-   SUPABASE
-===================================================== */
-
-const SUPABASE_URL =
-    "https://ihbsxjgzrhnssluqooqh.supabase.co";
-
-const SUPABASE_ANON_KEY =
-    "sb_publishable_hHyHJI5JkxgLNrXAwZrGWQ_vbD3kdrj";
+const VIDEO_URL =
+    "https://ihbsxjgzrhnssluqooqh.supabase.co/storage/v1/object/public/videos/76f21a1a675395424d04dc0afe588dbf.mp4";
 
 
-const supabase =
-    window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
-    );
+/* =====================================
+   مشخصات فیلم
+===================================== */
+
+const VIDEO_TITLE =
+    "فیلم من";
+
+const VIDEO_INFO =
+    "توضیحات فیلم";
 
 
-/* =====================================================
-   DEVICE ID
-===================================================== */
+/* =====================================
+   نمایش فیلم
+===================================== */
 
-function getDeviceId(){
+const video =
+    document.getElementById("video");
 
-    let deviceId =
-        localStorage.getItem(
-            "video_device_id"
-        );
-
-
-    if(!deviceId){
-
-        deviceId =
-            crypto.randomUUID();
-
-        localStorage.setItem(
-            "video_device_id",
-            deviceId
-        );
-    }
+video.src =
+    VIDEO_URL;
 
 
-    return deviceId;
-}
+/* =====================================
+   عنوان
+===================================== */
 
-
-/* =====================================================
-   LOAD VIDEO
-===================================================== */
-
-async function loadVideo(){
-
-    const result =
-        await supabase
-        .from("videos")
-        .select(
-            "id,video_url,title,description,uploaded_at"
-        )
-        .eq(
-            "id",
-            1
-        )
-        .maybeSingle();
-
-
-    if(result.error){
-
-        showError(
-            result.error.message
-        );
-
-        return;
-    }
-
-
-    if(!result.data){
-
-        document
-        .getElementById("video")
-        .style.display =
-            "none";
-
-        document
-        .getElementById("empty")
-        .style.display =
-            "block";
-
-        return;
-    }
-
-
-    const data =
-        result.data;
-
-
-    /* فیلم */
-
-    const video =
-        document.getElementById(
-            "video"
-        );
-
-    video.src =
-        data.video_url;
-
-
-    /* عنوان */
-
-    document
-    .getElementById("title")
+document.getElementById("title")
     .textContent =
-        data.title || "Video";
+    VIDEO_TITLE;
 
 
-    /* توضیحات */
+/* =====================================
+   توضیحات
+===================================== */
 
-    document
-    .getElementById("description")
+document.getElementById("info")
     .textContent =
-        data.description || "";
-
-
-    /* تاریخ */
-
-    if(data.uploaded_at){
-
-        const date =
-            new Date(
-                data.uploaded_at
-            );
-
-        document
-        .getElementById("date")
-        .textContent =
-            date.toLocaleDateString(
-                "fa-IR"
-            );
-    }
-
-
-    /* ثبت بازدید */
-
-    await registerView(
-        data.id
-    );
-
-
-    /* تعداد بازدید */
-
-    await loadViews(
-        data.id
-    );
-
-}
-
-
-/* =====================================================
-   REGISTER VIEW
-===================================================== */
-
-async function registerView(
-    videoId
-){
-
-    const deviceId =
-        getDeviceId();
-
-
-    const result =
-        await supabase
-        .from("video_views")
-        .insert({
-
-            video_id:
-                videoId,
-
-            device_id:
-                deviceId
-
-        });
-
-
-    /*
-       اگر قبلاً این دستگاه
-       بازدید کرده باشد،
-       Unique Constraint مانع
-       ثبت مجدد می‌شود.
-    */
-
-    if(result.error){
-
-        console.log(
-            "View already exists."
-        );
-    }
-
-}
-
-
-/* =====================================================
-   LOAD VIEW COUNT
-===================================================== */
-
-async function loadViews(
-    videoId
-){
-
-    const result =
-        await supabase
-        .from("video_views")
-        .select(
-            "id",
-            {
-                count:"exact",
-                head:true
-            }
-        )
-        .eq(
-            "video_id",
-            videoId
-        );
-
-
-    if(result.error){
-
-        console.error(
-            result.error
-        );
-
-        return;
-    }
-
-
-    document
-    .getElementById("views")
-    .textContent =
-        result.count || 0;
-
-}
-
-
-/* =====================================================
-   ERROR
-===================================================== */
-
-function showError(
-    message
-){
-
-    const error =
-        document.getElementById(
-            "error"
-        );
-
-
-    error.style.display =
-        "block";
-
-
-    error.textContent =
-        "خطا: " + message;
-
-}
-
-
-/* =====================================================
-   START
-===================================================== */
-
-loadVideo();
+    VIDEO_INFO;
 
 </script>
 
 </body>
-
 </html>
