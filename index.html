@@ -1,373 +1,361 @@
 <!DOCTYPE html>
 <html lang="fa">
+
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
 <title>Video</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
+
 *{
     box-sizing:border-box;
 }
 
+html,
 body{
     margin:0;
-    background:#0b0b0b;
-    color:#fff;
+    padding:0;
+    background:#080808;
+    color:white;
     font-family:Arial,sans-serif;
+}
+
+body{
+    min-height:100vh;
 }
 
 main{
     width:100%;
     max-width:900px;
     margin:auto;
-    padding:20px;
+    padding:16px;
 }
 
-video{
+
+/* VIDEO */
+
+#video{
     width:100%;
-    max-height:75vh;
-    background:#000;
-    border-radius:14px;
     display:block;
+    background:#000;
+    border-radius:15px;
 }
 
-#views{
-    margin-top:12px;
+
+/* TITLE */
+
+#title{
+    margin-top:15px;
+    font-size:21px;
+    font-weight:bold;
+}
+
+
+/* DESCRIPTION */
+
+#description{
+    margin-top:8px;
     color:#aaa;
     font-size:15px;
+    line-height:1.7;
 }
 
-#ownerPanel{
-    display:none;
-    margin-top:25px;
-    padding:18px;
-    border-radius:14px;
-    background:#151515;
-}
 
-button,
-input{
-    width:100%;
-    margin-top:10px;
-    padding:13px;
-    border:0;
-    border-radius:10px;
-}
+/* INFO */
 
-button{
-    background:#fff;
-    color:#000;
-    font-weight:bold;
-    cursor:pointer;
-}
-
-#status{
-    margin-top:12px;
-    color:#aaa;
+#info{
+    display:flex;
+    gap:18px;
+    margin-top:14px;
+    color:#999;
     font-size:14px;
 }
 
-#upload{
-    display:none;
-}
+
+/* EMPTY */
 
 #empty{
+    display:none;
     text-align:center;
-    color:#777;
     padding:80px 10px;
+    color:#777;
 }
+
+
+/* ERROR */
+
+#error{
+    display:none;
+    padding:20px;
+    color:#ff7777;
+    text-align:center;
+}
+
 </style>
+
 </head>
+
 
 <body>
 
 <main>
 
-    <div id="videoContainer"></div>
+    <video
+        id="video"
+        controls
+        playsinline
+        preload="metadata"
+    ></video>
+
+
+    <div id="title"></div>
+
+    <div id="description"></div>
+
+
+    <div id="info">
+
+        <div>
+            👁 <span id="views">0</span> بازدید
+        </div>
+
+        <div>
+            📅 <span id="date">-</span>
+        </div>
+
+    </div>
+
 
     <div id="empty">
-        هنوز ویدیویی آپلود نشده است.
+        هنوز فیلمی قرار داده نشده است.
     </div>
 
-    <div id="views">
-        0 بازدید
-    </div>
 
-    <div id="ownerPanel">
-
-        <b>پنل آپلود</b>
-
-        <input
-            id="upload"
-            type="file"
-            accept="video/*"
-        >
-
-        <button onclick="chooseVideo()">
-            انتخاب فیلم
-        </button>
-
-        <button onclick="uploadVideo()">
-            آپلود و جایگزینی فیلم
-        </button>
-
-        <div id="status"></div>
-
-    </div>
+    <div id="error"></div>
 
 </main>
 
+
 <script>
 
-const SUPABASE_URL = "https://ihbsxjgzrhnssluqooqh.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_hHyHJI5JkxgLNrXAwZrGWQ_vbD3kdrj";
 
-const supabase = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-);
+/* =====================================================
+   SUPABASE
+===================================================== */
+
+const SUPABASE_URL =
+    "https://ihbsxjgzrhnssluqooqh.supabase.co";
+
+const SUPABASE_ANON_KEY =
+    "sb_publishable_hHyHJI5JkxgLNrXAwZrGWQ_vbD3kdrj";
 
 
-/* =========================
+const supabase =
+    window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+    );
+
+
+/* =====================================================
    DEVICE ID
-========================= */
+===================================================== */
 
 function getDeviceId(){
 
-    let id = localStorage.getItem("video_device_id");
+    let deviceId =
+        localStorage.getItem(
+            "video_device_id"
+        );
 
-    if(!id){
 
-        id =
+    if(!deviceId){
+
+        deviceId =
             crypto.randomUUID();
 
         localStorage.setItem(
             "video_device_id",
-            id
+            deviceId
         );
     }
 
-    return id;
+
+    return deviceId;
 }
 
 
-/* =========================
-   OWNER ID
-========================= */
-
-function getOwnerId(){
-
-    let id = localStorage.getItem(
-        "video_owner_id"
-    );
-
-    if(!id){
-
-        id = crypto.randomUUID();
-
-        localStorage.setItem(
-            "video_owner_id",
-            id
-        );
-    }
-
-    return id;
-}
-
-
-/* =========================
-   FIND / CREATE OWNER
-========================= */
-
-async function checkOwner(){
-
-    const ownerId = getOwnerId();
-
-    const { data, error } = await supabase
-        .from("site_owner")
-        .select("owner_id")
-        .limit(1);
-
-    if(error){
-
-        console.error(error);
-        return;
-    }
-
-
-    /*
-       هیچ مالکی وجود ندارد.
-       این اولین کاربر است.
-    */
-
-    if(!data || data.length === 0){
-
-        const { error: insertError } =
-            await supabase
-            .from("site_owner")
-            .insert({
-                owner_id: ownerId
-            });
-
-        if(!insertError){
-
-            showOwnerPanel(true);
-            return;
-        }
-    }
-
-
-    /*
-       بررسی اینکه این دستگاه
-       همان مالک اولیه است یا نه.
-    */
-
-    if(
-        data &&
-        data.length > 0 &&
-        data[0].owner_id === ownerId
-    ){
-
-        showOwnerPanel(true);
-
-    }else{
-
-        showOwnerPanel(false);
-    }
-}
-
-
-/* =========================
-   OWNER PANEL
-========================= */
-
-function showOwnerPanel(show){
-
-    document.getElementById(
-        "ownerPanel"
-    ).style.display =
-        show ? "block" : "none";
-}
-
-
-/* =========================
+/* =====================================================
    LOAD VIDEO
-========================= */
+===================================================== */
 
 async function loadVideo(){
 
-    const { data, error } = await supabase
-        .from("video")
-        .select("*")
-        .order("id", {
-            ascending:false
-        })
-        .limit(1);
-
-    if(error){
-
-        console.error(error);
-        return;
-    }
-
-    if(!data || data.length === 0){
-
-        document.getElementById(
-            "empty"
-        ).style.display = "block";
-
-        return;
-    }
-
-    document.getElementById(
-        "empty"
-    ).style.display = "none";
-
-
-    const currentVideo = data[0];
-
-    const {
-        data: publicData
-    } = supabase.storage
+    const result =
+        await supabase
         .from("videos")
-        .getPublicUrl(
-            currentVideo.file_path
+        .select(
+            "id,video_url,title,description,uploaded_at"
+        )
+        .eq(
+            "id",
+            1
+        )
+        .maybeSingle();
+
+
+    if(result.error){
+
+        showError(
+            result.error.message
         );
 
-    const url =
-        publicData.publicUrl;
+        return;
+    }
 
 
-    document.getElementById(
-        "videoContainer"
-    ).innerHTML = `
-        <video
-            id="mainVideo"
-            controls
-            playsinline
-            preload="metadata"
-            src="${url}">
-        </video>
-    `;
+    if(!result.data){
 
+        document
+        .getElementById("video")
+        .style.display =
+            "none";
+
+        document
+        .getElementById("empty")
+        .style.display =
+            "block";
+
+        return;
+    }
+
+
+    const data =
+        result.data;
+
+
+    /* فیلم */
+
+    const video =
+        document.getElementById(
+            "video"
+        );
+
+    video.src =
+        data.video_url;
+
+
+    /* عنوان */
+
+    document
+    .getElementById("title")
+    .textContent =
+        data.title || "Video";
+
+
+    /* توضیحات */
+
+    document
+    .getElementById("description")
+    .textContent =
+        data.description || "";
+
+
+    /* تاریخ */
+
+    if(data.uploaded_at){
+
+        const date =
+            new Date(
+                data.uploaded_at
+            );
+
+        document
+        .getElementById("date")
+        .textContent =
+            date.toLocaleDateString(
+                "fa-IR"
+            );
+    }
+
+
+    /* ثبت بازدید */
 
     await registerView(
-        currentVideo.id
+        data.id
     );
 
+
+    /* تعداد بازدید */
+
     await loadViews(
-        currentVideo.id
+        data.id
     );
+
 }
 
 
-/* =========================
+/* =====================================================
    REGISTER VIEW
-========================= */
+===================================================== */
 
-async function registerView(videoId){
+async function registerView(
+    videoId
+){
 
     const deviceId =
         getDeviceId();
 
-    /*
-       unique(video_id, device_id)
-       باعث می‌شود یک دستگاه
-       برای یک فیلم دوباره ثبت نشود.
-    */
 
-    const { error } =
+    const result =
         await supabase
         .from("video_views")
         .insert({
-            video_id: videoId,
-            device_id: deviceId
+
+            video_id:
+                videoId,
+
+            device_id:
+                deviceId
+
         });
 
+
     /*
-       اگر duplicate باشد،
-       عمداً هیچ کاری نمی‌کنیم.
+       اگر قبلاً این دستگاه
+       بازدید کرده باشد،
+       Unique Constraint مانع
+       ثبت مجدد می‌شود.
     */
 
-    if(error){
+    if(result.error){
 
         console.log(
-            "View already registered."
+            "View already exists."
         );
     }
+
 }
 
 
-/* =========================
-   LOAD VIEWS
-========================= */
+/* =====================================================
+   LOAD VIEW COUNT
+===================================================== */
 
-async function loadViews(videoId){
+async function loadViews(
+    videoId
+){
 
-    const { count, error } =
+    const result =
         await supabase
         .from("video_views")
         .select(
@@ -382,206 +370,57 @@ async function loadViews(videoId){
             videoId
         );
 
-    if(error){
 
-        console.error(error);
+    if(result.error){
+
+        console.error(
+            result.error
+        );
+
         return;
     }
 
-    document.getElementById(
-        "views"
-    ).textContent =
-        `${count || 0} بازدید`;
+
+    document
+    .getElementById("views")
+    .textContent =
+        result.count || 0;
+
 }
 
 
-/* =========================
-   CHOOSE VIDEO
-========================= */
+/* =====================================================
+   ERROR
+===================================================== */
 
-function chooseVideo(){
+function showError(
+    message
+){
 
-    document.getElementById(
-        "upload"
-    ).click();
-}
-
-
-/* =========================
-   UPLOAD
-========================= */
-
-async function uploadVideo(){
-
-    const input =
+    const error =
         document.getElementById(
-            "upload"
-        );
-
-    const status =
-        document.getElementById(
-            "status"
-        );
-
-    if(
-        !input.files ||
-        input.files.length === 0
-    ){
-
-        status.textContent =
-            "ابتدا یک فیلم انتخاب کن.";
-
-        return;
-    }
-
-    const file =
-        input.files[0];
-
-
-    if(!file.type.startsWith("video/")){
-
-        status.textContent =
-            "فایل انتخاب شده فیلم نیست.";
-
-        return;
-    }
-
-
-    status.textContent =
-        "در حال جایگزینی فیلم...";
-
-
-    /*
-       نام ثابت.
-       بنابراین همیشه فقط یک فایل داریم.
-    */
-
-    const filePath =
-        "current_video";
-
-
-    /*
-       حذف فیلم قبلی از Storage
-    */
-
-    const { data: oldVideos } =
-        await supabase.storage
-        .from("videos")
-        .list();
-
-
-    if(oldVideos){
-
-        const files =
-            oldVideos
-            .filter(
-                x => x.name === filePath
-            )
-            .map(
-                x => x.name
-            );
-
-        if(files.length){
-
-            await supabase.storage
-                .from("videos")
-                .remove(files);
-        }
-    }
-
-
-    /*
-       آپلود فیلم جدید
-    */
-
-    const { error: uploadError } =
-        await supabase.storage
-        .from("videos")
-        .upload(
-            filePath,
-            file,
-            {
-                upsert:true,
-                contentType:file.type,
-                cacheControl:"0"
-            }
+            "error"
         );
 
 
-    if(uploadError){
-
-        console.error(uploadError);
-
-        status.textContent =
-            "خطا در آپلود: " +
-            uploadError.message;
-
-        return;
-    }
+    error.style.display =
+        "block";
 
 
-    /*
-       اطلاعات ویدیوی قبلی را پاک کن.
-       Cascade باعث می‌شود بازدیدهای
-       فیلم قبلی هم پاک شوند.
-    */
+    error.textContent =
+        "خطا: " + message;
 
-    await supabase
-        .from("video")
-        .delete()
-        .neq(
-            "id",
-            0
-        );
-
-
-    /*
-       ثبت فیلم جدید
-    */
-
-    const { error: dbError } =
-        await supabase
-        .from("video")
-        .insert({
-            file_path:filePath,
-            file_name:file.name
-        });
-
-
-    if(dbError){
-
-        console.error(dbError);
-
-        status.textContent =
-            "فیلم آپلود شد ولی ثبت اطلاعات خطا داشت.";
-
-        return;
-    }
-
-
-    status.textContent =
-        "فیلم جدید جایگزین شد.";
-
-    input.value = "";
-
-    await loadVideo();
 }
 
 
-/* =========================
+/* =====================================================
    START
-========================= */
+===================================================== */
 
-async function start(){
-
-    await checkOwner();
-
-    await loadVideo();
-}
-
-start();
+loadVideo();
 
 </script>
 
 </body>
+
 </html>
